@@ -12,6 +12,7 @@ pe=None
 args=None
 ida=None
 code_loc = None
+old_reloc = None
 
 p64 = lambda v: struct.pack('<Q', v)
 p32 = lambda v: struct.pack('<I', v)
@@ -262,14 +263,14 @@ def update_reloc_raw(type, raw, v):
         assert False, 'TODO'
 
 def update_and_verify_section_table():
-    # update .reloc in section table
-    idx = [i for i,j in enumerate(pe.sections) if '.reloc' in j.Name][0]
-    reloc = pe.sections.pop(idx)
-    old_reloc_size = reloc.SizeOfRawData
-    reloc.VirtualAddress = get_last_section('rva')
-    reloc.PointerToRawData = get_last_section('fa')
-    reloc.set_file_offset(get_last_section('tbl'))
-    pe.sections.append(reloc)
+    # update .reloc in section table   
+    # idx = [i for i,j in enumerate(pe.sections) if '.reloc' in j.Name][0]
+    # reloc = pe.sections.pop(idx) 
+    old_reloc_size = old_reloc.SizeOfRawData
+    old_reloc.VirtualAddress = get_last_section('rva')
+    old_reloc.PointerToRawData = get_last_section('fa')
+    old_reloc.set_file_offset(get_last_section('tbl'))
+    pe.sections.append(old_reloc)
     # confirm all sections have to stick together, don't overlap or seperate
     rva = 0
     fa = 0
@@ -384,9 +385,10 @@ def dup_sec(sec, name=None, size=0):
     diff = get_sec_by_name('.reloc').SizeOfRawData if '.reloc' in pe.sections[-1].Name else 0
     s.VirtualAddress = get_last_section('rva') - align_sec(diff)
     s.PointerToRawData = get_last_section('fa') - align_file(diff)
-    ss = size if size else sec.SizeOfRawData*args.enlarge
-    s.Misc_VirtualSize = align_sec(ss)
-    s.SizeOfRawData = align_file(ss)
+    virtualsize = size if size else sec.Misc_VirtualSize*args.enlarge
+    rawsize = size if size else sec.SizeOfRawData*args.enlarge
+    s.Misc_VirtualSize = align_sec(virtualsize)
+    s.SizeOfRawData = align_file(rawsize)
     diff = s.sizeof() if '.reloc' in pe.sections[-1].Name else 0
     s.set_file_offset(get_last_section('tbl') - diff)
     s.next_section_virtual_address = s.VirtualAddress + s.Misc_VirtualSize
@@ -424,8 +426,11 @@ def process_pe():
     # add new section entry, size of new section is affected by args.enlarge
     assert '.reloc' in pe.sections[-1].Name, '.reloc is not at the end'
     assert pe.get_length() == get_last_section('fa'), 'overlays is behind PE'
+    idx = [i for i,j in enumerate(pe.sections) if '.reloc' in j.Name][0]
+    global old_reloc
+    old_reloc = pe.sections.pop(idx)
     for sec in sorted(pe.sections, key=lambda s: s.PointerToRawData):
-        if is_exe(sec):
+        if is_exe(sec) and sec.SizeOfRawData > 0:
             # empty inject is for triggering the data update later
             if not hasattr(sec, 'addr_set'):
                 inject_code(sec.VirtualAddress+pe.OPTIONAL_HEADER.ImageBase, '')

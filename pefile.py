@@ -2257,7 +2257,7 @@ class PE(object):
         file_data = bytearray(self.__data__)
 
         for structure in self.__structures__:
-            struct_data = bytearray(structure.__pack__())
+            struct_data = bytearray(structure.__pack__())            
             offset = structure.get_file_offset()
             file_data[offset:offset+len(struct_data)] = struct_data
 
@@ -2292,7 +2292,7 @@ class PE(object):
             file_data += append
         # used for update section raw data
         for s in self.sections:
-            if hasattr(s, 'raw'):
+            if hasattr(s, 'raw') and s.SizeOfRawData > 0: # patch for 0-sized section
                 file_data = file_data[:s.PointerToRawData] + s.raw + file_data[s.PointerToRawData+s.SizeOfRawData:]
 
         new_file_data = file_data
