@@ -24,25 +24,31 @@ else:
     from pwn import *
 
 C_ADDR1, C_ADDR2 = [0x44444444]*2
+C_TLS_INDEX, C_TLS_SLOT_OFFSET, C_AFL_PREV_LOC, C_AFL_AREA_PTR =  [0x55555555]*4
 M_PREV_LOC1, M_PREV_LOC2, M_ID, M_AREA_PTR, M_CALLBACK, MAGIC = [0x55555555]*6
 
 snip = {}
 def init_snip():
     snip['nop'] = '\x90'*0x24
+
+# snip for single mode
     snip['single'] = asm('''
-push ebx
 push eax
+push ebx
 lahf
 seto al
-mov ebx, dword ptr ['''+hex(M_PREV_LOC1)+''']           # __afl_prev_loc @ .cov+0x10000
-xor ebx, '''+hex(C_ADDR1)+'''
-inc byte ptr ['''+hex(M_AREA_PTR)+'''+ebx]              # __afl_area_ptr @ .cov
-mov dword ptr ['''+hex(M_PREV_LOC2)+'''], '''+hex(C_ADDR2)+'''
+mov ebx, '''+hex(C_ADDR1)+'''
+xor ebx, dword ptr ['''+hex(C_AFL_PREV_LOC)+''']           # __afl_prev_loc @ .cov+0x10000
+add ebx, dword ptr ['''+hex(C_AFL_AREA_PTR)+''']
+inc byte ptr [ebx]                                         # __afl_area_ptr @ .cov
+mov dword ptr ['''+hex(C_AFL_PREV_LOC)+'''], '''+hex(C_ADDR2)+'''
 add al, 127
 sahf
-pop eax
 pop ebx
+pop eax
 ''')
+
+# snip for multi-thread mode
     snip['multi'] = asm('''
 push ecx
 push ebx
@@ -61,6 +67,8 @@ pop eax
 pop ebx
 pop ecx
 ''')
+
+# 
     PsGetCurrentProcessId_win10 = '''
 mov ebx, fs:0x124
 mov ebx, dword ptr [ebx+0x37c]

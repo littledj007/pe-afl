@@ -523,8 +523,13 @@ def process_pe():
     if hasattr(args, 'pe_afl') and not args.nop:
         print('updating relocation in instrumented code ...')
         t = pefile.RELOCATION_TYPE['IMAGE_REL_BASED_HIGHLOW'] if is_32() else pefile.RELOCATION_TYPE['IMAGE_REL_BASED_DIR64']
-        afl_area_ptr = get_sec_by_name('.cov').VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
-        afl_prev_loc = afl_area_ptr + 0x10000
+        s = get_sec_by_name('.cov')
+        cov_addr = s.VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
+        afl_area_ptr = cov_addr + 0xc
+        afl_prev_loc = cov_addr + 0x8
+        add_to_reloc(afl_area_ptr, t)
+        if not hasattr(s, 'raw'):
+            setattr(s, 'raw', '\x00'*0xc + p32(cov_addr + 0x10) + '\x00'*(s.SizeOfRawData - 0x10)) # give a padding
         if args.callback:
             rr = [afl_prev_loc+0x10, afl_prev_loc+0x20]
         elif args.filter:
