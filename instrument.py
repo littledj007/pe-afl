@@ -527,6 +527,7 @@ def process_pe():
         cov_addr = s.VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
         afl_area_ptr = cov_addr + 0xc
         afl_prev_loc = cov_addr + 0x8
+        thread_prev_loc = cov_addr + 0x10000
         add_to_reloc(afl_area_ptr, t)
         if not hasattr(s, 'raw'):
             setattr(s, 'raw', '\x00'*0xc + p32(cov_addr + 0x10) + '\x00'*(s.SizeOfRawData - 0x10)) # give a padding
@@ -534,7 +535,9 @@ def process_pe():
             rr = [afl_prev_loc+0x10, afl_prev_loc+0x20]
         elif args.filter:
             rr = [afl_prev_loc+0x10, afl_prev_loc, afl_area_ptr, afl_prev_loc]
-        else: # single and multi
+        elif args.multi: # single
+            rr = [thread_prev_loc, afl_area_ptr, thread_prev_loc]
+        else: # multi
             rr = [afl_prev_loc, afl_area_ptr, afl_prev_loc]
         for v in sorted(injected):
             if injected[v].tlen < args.snip_len:

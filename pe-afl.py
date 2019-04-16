@@ -24,7 +24,7 @@ else:
     from pwn import *
 
 C_ADDR1, C_ADDR2 = [0x44444444]*2
-C_TLS_INDEX, C_TLS_SLOT_OFFSET, C_AFL_PREV_LOC, C_AFL_AREA_PTR =  [0x55555555]*4
+C_TLS_INDEX, C_TLS_SLOT_OFFSET, C_AFL_PREV_LOC, C_AFL_AREA_PTR, C_THREAD_PREV_LOC =  [0x55555555]*5
 M_PREV_LOC1, M_PREV_LOC2, M_ID, M_AREA_PTR, M_CALLBACK, MAGIC = [0x55555555]*6
 
 snip = {}
@@ -38,9 +38,9 @@ push ebx
 lahf
 seto al
 mov ebx, '''+hex(C_ADDR1)+'''
-xor ebx, dword ptr ['''+hex(C_AFL_PREV_LOC)+''']           # __afl_prev_loc @ .cov+0x10000
+xor ebx, dword ptr ['''+hex(C_AFL_PREV_LOC)+''']           
 add ebx, dword ptr ['''+hex(C_AFL_AREA_PTR)+''']
-inc byte ptr [ebx]                                         # __afl_area_ptr @ .cov
+inc byte ptr [ebx]                                         
 mov dword ptr ['''+hex(C_AFL_PREV_LOC)+'''], '''+hex(C_ADDR2)+'''
 add al, 127
 sahf
@@ -55,12 +55,13 @@ push ebx
 push eax
 lahf
 seto al
-movzx ecx, byte ptr fs:[0x24]
+movzx ecx, byte ptr fs:[0x24]   # thread id
 shl ecx, 2
-mov ebx, dword ptr ['''+hex(M_PREV_LOC1)+'''+ecx]       # __afl_prev_loc @ .cov+0x10000
-xor ebx, '''+hex(C_ADDR1)+'''
-inc byte ptr ['''+hex(M_AREA_PTR)+'''+ebx]              # __afl_area_ptr @ .cov
-mov dword ptr ['''+hex(M_PREV_LOC2)+'''+ecx], '''+hex(C_ADDR2)+'''
+mov ebx, '''+hex(C_ADDR1)+'''
+xor ebx, dword ptr ['''+hex(C_THREAD_PREV_LOC)+'''+ecx]
+add ebx, dword ptr ['''+hex(C_AFL_AREA_PTR)+''']
+inc byte ptr [ebx]
+mov dword ptr ['''+hex(C_THREAD_PREV_LOC)+'''+ecx], '''+hex(C_ADDR2)+'''
 add al, 127
 sahf
 pop eax
