@@ -585,6 +585,7 @@ def process_pe():
 
     # update export table
     if hasattr(pe, 'DIRECTORY_ENTRY_EXPORT'):
+        stext = get_sec_by_name('.text')
         for e in pe.DIRECTORY_ENTRY_EXPORT.symbols:
             s = get_sec_by_rva(e.address)
             if not is_exe(s):
@@ -592,7 +593,12 @@ def process_pe():
             s = get_sec_by_ofs(e.address_offset)
             if not hasattr(s, 'raw'):
                 setattr(s, 'raw', p32(s.PointerToRawData) + '\x00'*(s.PointerToRawData-4) + s.get_data()) # padding
-            s.raw = strrep(s.raw, e.address_offset, p32(update_addr(e.address)))
+            if not hasattr(stext, 'raw'):
+                setattr(stext, 'raw', p32(stext.PointerToRawData) + '\x00'*(stext.PointerToRawData-4) + stext.get_data()) # give a padding    
+            #print('fix export: '+hex(stext.PointerToRawData))
+            newaddr = update_addr(e.address)
+            stext.raw = strrep(stext.raw, e.address - stext.VirtualAddress + stext.PointerToRawData, '\xe9' + p32(newaddr-e.address-5))
+            s.raw = strrep(s.raw, e.address_offset, p32(newaddr))
 
     # update SEHHandlerTable and GuardCFFunctionTable
     d = pe.get_directory_by_name('IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG')
